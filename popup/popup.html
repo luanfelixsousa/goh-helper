@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <h1>GoH Helper</h1>
+    <label class="switch">
+      <input type="checkbox" id="master" />
+      <span id="masterLabel">Ligado</span>
+    </label>
+  </header>
+
+  <section>
+    <h2>Tarefas</h2>
+    <div id="tasks" class="tasks"><p class="empty">Abra gameofheroes.com para carregar as tarefas.</p></div>
+  </section>
+
+  <section class="row">
+    <h2>Recarregar pagina</h2>
+    <div class="reload">
+      <input type="number" id="reloadMinutes" min="1" max="600" step="1" />
+      <span>minutos</span>
+      <button id="reloadNow" type="button">F5 agora</button>
+    </div>
+  </section>
+
+
+  <section>
+    <h2>Atributos por heroi</h2>
+    <div id="heroes" class="attrs"></div>
+    <div class="reload">
+      <span>verificar a cada</span>
+      <input type="number" id="attrSweepMinutes" min="1" max="120" step="1" />
+      <span>min</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Log <button id="clearLog" class="link" type="button">limpar</button></h2>
+    <ul id="log" class="log"></ul>
+  </section>
+
+  <footer class="credit">Feito por luan.felix</footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
