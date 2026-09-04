@@ -24,7 +24,7 @@ Tudo pode ser ligado e desligado uma a uma no painel, e existe um interruptor ge
 - Suas configuracoes e o log ficam **so na sua maquina** e somem se voce desinstalar.
 - So funciona em `gameofheroes.com`. Nenhuma outra aba e acessada.
 - O codigo esta todo ai na pasta, em texto puro. Pode ler tudo antes de instalar.
-- Como você pode validar tudo acima? A pasta já é o código descompactado, valide manualmente ou com IA. (Se mesmo assim duvidar, não baixe e não me pertube)
+- Como você pode validar tudo acima? A pasta já é o código descompactado, valide manualmente ou com IA. (Se mesmo assim duvidar, não baixe e me pertube)
 
 ## Passo a passo da instalacao
 
