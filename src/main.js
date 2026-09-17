@@ -38,15 +38,21 @@
     chrome.storage.local.set({ catalog });
   }
 
+  /* Normaliza os campos conhecidos SEM descartar os demais (attrPlan,
+     attrSweepMinutes e o que mais o popup salvar). Antes isto jogava fora o
+     attrPlan, fazendo a escolha de atributo reverter pro padrao. */
+  function normalizar(s, defaults) {
+    return Object.assign({}, s, {
+      enabled: s.enabled !== false,
+      reloadMinutes: Number(s.reloadMinutes) > 0 ? Number(s.reloadMinutes) : 30,
+      tasks: Object.assign({}, defaults.tasks, s.tasks || {}),
+    });
+  }
+
   function loadSettings(cb) {
     const defaults = defaultSettings();
     chrome.storage.local.get({ settings: defaults }, (d) => {
-      const s = d.settings || defaults;
-      settings = {
-        enabled: s.enabled !== false,
-        reloadMinutes: Number(s.reloadMinutes) > 0 ? Number(s.reloadMinutes) : 30,
-        tasks: Object.assign({}, defaults.tasks, s.tasks || {}),
-      };
+      settings = normalizar(d.settings || defaults, defaults);
       // Garante que tarefas novas apareçam salvas com o valor padrao.
       chrome.storage.local.set({ settings });
       if (cb) cb();
@@ -55,12 +61,7 @@
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes.settings) return;
-    const s = changes.settings.newValue || {};
-    settings = {
-      enabled: s.enabled !== false,
-      reloadMinutes: Number(s.reloadMinutes) > 0 ? Number(s.reloadMinutes) : 30,
-      tasks: Object.assign({}, defaultSettings().tasks, s.tasks || {}),
-    };
+    settings = normalizar(changes.settings.newValue || {}, defaultSettings());
   });
 
   function tick() {
