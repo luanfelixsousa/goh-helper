@@ -65,7 +65,9 @@ async function reloadGameTabs(reason) {
    valido; qualquer erro mantem o que ja tinha (e o fallback embutido). */
 async function fetchRemoteConfig() {
   try {
-    const res = await fetch(CONFIG_URL, { cache: 'no-cache' });
+    // cache-buster na query: a CDN do GitHub pode servir versao velha por
+    // alguns minutos; o ?t=<agora> garante sempre o config.json mais recente.
+    const res = await fetch(CONFIG_URL + '?t=' + Date.now(), { cache: 'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const cfg = await res.json();
     if (!cfg || typeof cfg !== 'object') throw new Error('json invalido');
