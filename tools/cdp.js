@@ -74,8 +74,46 @@ const TOP_EXPR = (px) => `(() => {
   return 'url: ' + location.href + '\\ntotal: ' + out.length + '\\n\\n' + out.join('\\n\\n');
 })()`;
 
+/* Captura o trafego da aba por N segundos usando o dominio Network do CDP.
+   node tools/cdp.js net [segundos] [filtro]   - filtro padrao: /api/ */
+function capture(target, segundos, filtro) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(target.webSocketDebuggerUrl);
+    const reqs = new Map();
+    const linhas = [];
+    let id = 100;
+    const send = (method, params) => ws.send(JSON.stringify({ id: id++, method, params }));
+
+    const timer = setTimeout(() => { try { ws.close(); } catch (_) {} resolve(linhas); }, segundos * 1000);
+    ws.onerror = (e) => { clearTimeout(timer); reject(new Error('WebSocket: ' + (e.message || 'falhou'))); };
+    ws.onopen = () => send('Network.enable', {});
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      const p = msg.params;
+      if (msg.method === 'Network.requestWillBeSent') {
+        if (p.request.url.indexOf(filtro) === -1) return;
+        reqs.set(p.requestId, { url: p.request.url, metodo: p.request.method, t: Date.now() });
+      } else if (msg.method === 'Network.responseReceived') {
+        const r = reqs.get(p.requestId);
+        if (!r) return;
+        r.status = p.response.status;
+        r.tipo = p.response.mimeType;
+      } else if (msg.method === 'Network.loadingFinished') {
+        const r = reqs.get(p.requestId);
+        if (!r) return;
+        reqs.delete(p.requestId);
+        linhas.push(
+          new Date(r.t).toLocaleTimeString() + '  ' + r.metodo.padEnd(6) +
+          (r.status || '???') + '  ' + Math.round(p.encodedDataLength) + 'B  ' +
+          r.url.replace('https://gameofheroes.com', '')
+        );
+      }
+    };
+  });
+}
+
 (async () => {
-  const [cmd, arg] = process.argv.slice(2);
+  const [cmd, arg, arg2] = process.argv.slice(2);
   try {
     if (!cmd || cmd === 'targets') {
       const list = await targets();
@@ -93,6 +131,13 @@ const TOP_EXPR = (px) => `(() => {
       const file = arg || 'goh-page.html';
       fs.writeFileSync(file, html, 'utf8');
       console.log('salvo em ' + file + ' (' + Math.round(html.length / 1024) + ' KB)');
+    } else if (cmd === 'net') {
+      const segundos = Number(arg) || 20;
+      const filtro = arg2 || '/api/';
+      console.error('capturando ' + segundos + 's (filtro: ' + filtro + ')...');
+      const linhas = await capture(target, segundos, filtro);
+      console.log(linhas.length ? linhas.join('\n') : '(nenhuma requisicao casou com ' + filtro + ')');
+      console.log('\ntotal: ' + linhas.length + ' requisicoes em ' + segundos + 's');
     } else if (cmd === 'top') {
       console.log(await evaluate(target, TOP_EXPR(Number(arg) || 260)));
     } else {

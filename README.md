@@ -8,7 +8,7 @@ Extensao para Chrome/Edge e Edge que cuida das tarefas repetitivas do
 | Funcao | O que acontece |
 |---|---|
 | **Coletar Baus** | Clica em "Collect Chests" assim que o botao aparece (mesmo sem passe, sabemos que o jogo está desmarcando coletar báu toda hora) . |
-| **Distribuir atributos** | Quando um heroi ganha ponto, ela abre o status dele, gasta o ponto no atributo que **voce** escolheu, da Apply e recarrega para confirmar. |
+| **Distribuir atributos** | Quando um heroi tem Pontos, ela abre o Heroi, gasta no atributo que **voce** escolheu (Forca/Inteligencia/Destreza/Vitalidade) e da Aplicar. | Quando um heroi ganha ponto, ela abre o status dele, gasta o ponto no atributo que **voce** escolheu, da Apply e recarrega para confirmar. |
 | **Login automatico** | Se o jogo cair para a tela de login, ela clica em PLAY NOW e entra de novo. |
 | **Recarregar no aviso** | Quando aparece "Atualizar agora (F5)", ela da o F5 sozinha. |
 | **Reload periodico** | Recarrega a aba do jogo a cada 30 minutos (ajustavel). |
@@ -56,7 +56,7 @@ Clique no icone da extensao com o jogo aberto:
 - **Ligado / Parado** - interruptor geral. O icone mostra `ON` ou `OFF`.
 - **Tarefas** - liga e desliga cada funcao separadamente.
 - **Recarregar pagina** - de quantos em quantos minutos dar F5, e um botao "F5 agora".
-- **Atributos por heroi** - escolha `STR`, `INT`, `DEX` ou `VIT` para cada heroi e de
+- **Atributos por heroi** - escolha o atributo de cada classe e de quanto em quanto tempo ela verifica se ha ponto. Enquanto ninguem tiver ponto, ela nao abre nada.
   quanto em quanto tempo ela verifica se ha ponto disponivel. Enquanto ninguem tiver
   ponto, ela nao abre janela nenhuma no jogo.
 - **Log** - as ultimas 40 acoes, com horario. Bom para conferir se esta trabalhando.

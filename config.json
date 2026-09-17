@@ -1,0 +1,44 @@
+{
+  "configVersion": 1,
+  "codeVersion": "2.0.0",
+  "downloadUrl": "https://github.com/luanfelixsousa/goh-helper/releases",
+  "_comment": "Config remota - SO DADOS (seletores, textos, plano). Edite aqui quando o jogo mudar e todos pegam sozinhos, sem reinstalar. Suba 'configVersion' a cada mudanca. 'codeVersion' so muda quando o CODIGO da extensao muda (ai aparece o aviso de atualizar).",
+
+  "selectors": {
+    "chestButton": "button[class*=\"chestButton\"]",
+    "chestCount": [
+      "[data-testid=\"value-Baús\"]",
+      "[class*=\"chestCount\"] [class*=\"valueText\"]",
+      "section[aria-label=\"Baú de recompensa\"] [class*=\"valueText\"]"
+    ],
+    "heroCard": "aside li button[aria-label^=\"Abrir \"][data-hero]",
+    "heroPoints": "[data-testid=\"hero-points\"] [class*=\"pointsValue\"]",
+    "stepUp": "button[class*=\"stepUp\"]",
+    "attrRow": "tr[data-attr=\"attr.{attr}\"]",
+    "dialogHasAttr": "tr[data-attr]",
+    "cardSprite": "img[src*=\"classes\"]",
+    "cardName": "[class*=\"cardName\"]",
+    "closeModal": "button[aria-label=\"Voltar à batalha\"]",
+    "loadingInDialog": "[role=\"status\"], [class*=\"spinner\"], [class*=\"loading\"]"
+  },
+
+  "labels": {
+    "collect": ["Coletar", "Collect Chests", "Coletar Baus", "Coletar Baús"],
+    "loginButton": ["entrar", "login with email", "entrar com email"],
+    "apply": ["aplicar"],
+    "updatePrompt": ["Atualizar agora", "Update now", "Refresh now"],
+    "updating": ["recebendo atualizações", "recebendo atualizacoes", "reconectando", "reconnecting"],
+    "confirm": ["Confirm", "Confirmar", "Yes", "Sim"]
+  },
+
+  "heroNavRegex": "^her[oó]i",
+
+  "plan": {
+    "warrior": "strength",
+    "priest": "intelligence",
+    "ranger": "dexterity",
+    "wizard": "intelligence",
+    "mage": "intelligence",
+    "default": "strength"
+  }
+}

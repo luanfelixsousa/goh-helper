@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "GoH Helper",
-  "version": "1.0.0",
-  "description": "Automatiza acoes repetitivas em gameofheroes.com (coletar baus, reload periodico, etc).",
+  "version": "2.0.0",
+  "description": "Automatiza acoes repetitivas em gameofheroes.com (coletar baus, atributos, login, reload).",
   "permissions": [
     "storage",
     "alarms",
@@ -10,7 +10,8 @@
   ],
   "host_permissions": [
     "https://gameofheroes.com/*",
-    "https://*.gameofheroes.com/*"
+    "https://*.gameofheroes.com/*",
+    "https://raw.githubusercontent.com/*"
   ],
   "background": {
     "service_worker": "src/background.js"
@@ -23,6 +24,7 @@
       ],
       "js": [
         "src/core.js",
+        "src/config.js",
         "src/tasks.js",
         "src/inspect.js",
         "src/main.js"

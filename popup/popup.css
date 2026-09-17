@@ -34,3 +34,7 @@ button.link:hover { color: #e7e9ee; }
 .attr span { font-weight: 600; }
 select { background: #16181d; color: inherit; border: 1px solid #2b2f3a; border-radius: 5px; padding: 4px; font: inherit; }
 .credit { margin-top: 12px; padding-top: 8px; border-top: 1px solid #2b2f3a; text-align: center; color: #6f7686; font-size: 11px; letter-spacing: .3px; }
+.update { display: block; margin-top: 10px; padding: 8px 10px; background: #3a2d12; border: 1px solid #a8791f; border-radius: 6px; color: #ffd98a; font-size: 12px; text-align: center; text-decoration: none; }
+.update:hover { background: #4a3917; }
+.credit { display: flex; justify-content: space-between; align-items: center; }
+.ver { color: #565c6b; font-size: 10px; }

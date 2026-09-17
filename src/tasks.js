@@ -10,6 +10,14 @@
      defaultEnabled ligada por padrao na primeira instalacao
      run()          retorna: falsy = nada feito | string = mensagem do log | true = feito
                     pode ser async: o loop pausa as outras tarefas ate terminar
+
+   ATUALIZADO PARA A v2 (Game of Heroes v2, 16/09/2026):
+     - o jogo agora e servido na raiz "/" (nao mais em "/game")
+     - interface toda em portugues
+     - tela de herois reescrita: botao "Heroi" -> painel lateral com cartoes ->
+       modal por heroi com tabela de atributos
+   Onde da, os seletores usam marcadores estaveis (data-attr, data-testid,
+   class*="token", sprite do arquivo) em vez do texto traduzido.
 */
 (() => {
   const G = window.__GOH__;
@@ -17,19 +25,64 @@
   G.tasksLoaded = true;
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const noJogo = () => location.pathname.indexOf('/game') === 0;
+
+  /* Estamos na tela de login? (v2 redireciona para /login quando deslogado) */
+  const naTelaLogin = () =>
+    location.pathname.indexOf('/login') === 0 ||
+    !!document.querySelector('input[type="password"]');
+
+  // atalhos para a config (com fallback embutido, ver src/config.js)
+  const CFG = G.cfg;
+  const primeiroVisivel = (sel) => Array.from(document.querySelectorAll(sel)).find(G.isVisible);
+
+  /* HUD do jogo carregada? (botao Coletar ou o canvas do Phaser) */
+  const noJogo = () =>
+    !naTelaLogin() &&
+    !!(document.querySelector(CFG.sel('chestButton')) ||
+       document.querySelector('.phaser-host canvas'));
+
+  /* O servidor esta empurrando atualizacao / reconectando? Nesse estado os
+     paineis nao carregam (cartoes vazios), entao a varredura nao deve rodar. */
+  const jogoAtualizando = () => !!G.findByText(CFG.labels('updating'), { visible: true });
+
+  /* Quantos baus estao prontos pra coletar? Le o contador "X / Y" da HUD.
+     O botao "Coletar" NUNCA fica disabled (usa aria-pressed), entao clicar
+     com 0 baus dispara o "Jogo recebendo atualizacoes..." (reload fantasma).
+     Retorna o numero da esquerda, ou null se nao conseguir ler. */
+  function bausProntos() {
+    let el = null;
+    for (const sel of CFG.selList('chestCount')) {
+      el = document.querySelector(sel);
+      if (el) break;
+    }
+    if (!el) return null;
+    const m = G.norm(el.textContent).match(/(\d[\d.]*)\s*\/\s*\d/);
+    if (!m) return null;
+    return Number(m[1].replace(/\./g, '')) || 0;
+  }
 
   // ---------------------------------------------------------------- COLETAR BAUS
   G.registerTask({
     id: 'collect-chests',
     name: 'Coletar Baus',
-    description: 'Clica em "Collect Chests" / "Coletar Baus" assim que o botao aparece.',
+    description: 'Clica em "Coletar" so quando ha bau disponivel (evita o reload fantasma no 0).',
     everyMs: 1000,
     cooldownMs: 3000,
     defaultEnabled: true,
     run() {
-      const label = G.clickByText(['Collect Chests', 'Coletar Baus', 'Coletar Baús']);
-      return label ? 'Clicou: ' + label : false;
+      if (!noJogo()) return false;
+
+      // so age quando o contador mostra pelo menos 1 bau (ex.: "3 / 15").
+      // 0 ou desconhecido -> nao clica: clicar no 0 recarrega o jogo.
+      const n = bausProntos();
+      if (!n || n <= 0) return false;
+
+      const btn = primeiroVisivel(CFG.sel('chestButton')) ||
+        G.findByText(CFG.labels('collect'), { clickable: true });
+      if (!btn) return false;
+
+      G.click(btn);
+      return 'Coletou baus (' + n + ' pronto' + (n > 1 ? 's' : '') + ')';
     },
   });
 
@@ -42,7 +95,7 @@
     cooldownMs: 20000,
     defaultEnabled: true,
     run() {
-      const el = G.findByText(['Atualizar agora', 'Update now', 'Refresh now']);
+      const el = G.findByText(CFG.labels('updatePrompt'), { visible: true });
       if (!el) return false;
       setTimeout(() => location.reload(), 400);
       return 'Aviso de atualizacao detectado - recarregando a pagina';
@@ -50,58 +103,31 @@
   });
 
   /* ============================================================================
-     LOGIN AUTOMATICO
-
-     Fluxo mapeado em 04/09/2026:
-       /        -> <a> "PLAY NOW" (href=/login); tambem existe "PLAY"
-       /login   -> input#login-email + input#login-password (preenchidos pelo
-                   autofill do navegador) e <button> "Login with email"
-       /game    -> ja logado, nada a fazer
-     A extensao NAO guarda usuario nem senha: depende do autofill do navegador.
-     Se o servidor estiver cheio a tela volta pro /login, entao as tentativas
-     usam backoff crescente (30s, 60s, 90s... ate 5 min) para nao martelar.
+     LOGIN AUTOMATICO (v2)
+       tela em /login, campos sem id (input[type=email] / input[type=password])
+       botao "Entrar". A extensao NAO guarda credenciais: usa o autofill do
+       navegador. Backoff crescente para o caso "servidor cheio".
      ========================================================================== */
-
   let proximoLoginAt = 0;
   let tentativas = 0;
   let avisouCamposVazios = false;
 
-  const acharPorTexto = (textos, sel) =>
-    Array.from(document.querySelectorAll(sel || 'a, button')).find((el) => {
-      if (!G.isVisible(el)) return false;
-      const t = G.norm(el.textContent);
-      return textos.indexOf(t) !== -1;
-    });
-
   G.registerTask({
     id: 'auto-login',
     name: 'Login automatico',
-    description: 'Fora do jogo, clica em PLAY NOW e envia o login com os dados salvos no navegador.',
+    description: 'Na tela de login, envia "Entrar" com o email/senha salvos no navegador.',
     everyMs: 3000,
     cooldownMs: 5000,
     defaultEnabled: true,
     run() {
       if (noJogo()) { tentativas = 0; avisouCamposVazios = false; return false; }
+      if (!naTelaLogin()) return false;
       if (Date.now() < proximoLoginAt) return false;
 
-      const path = location.pathname;
-
-      // tela inicial: entra na tela de login
-      if (path === '/' || path === '' || path === '/home') {
-        const play = acharPorTexto(['play now', 'jogar agora']) || acharPorTexto(['play', 'jogar']);
-        if (!play) return false;
-        play.click();
-        proximoLoginAt = Date.now() + 4000;
-        return 'Clicou em PLAY NOW';
-      }
-
-      if (path.indexOf('/login') !== 0) return false;
-
-      const email = document.querySelector('#login-email, input[type="email"]');
-      const senha = document.querySelector('#login-password, input[type="password"]');
+      const email = document.querySelector('input[type="email"], #login-email');
+      const senha = document.querySelector('input[type="password"], #login-password');
       if (!email || !senha) return false;
 
-      // sem autofill nao ha o que fazer - a extensao nao guarda credenciais
       if (!email.value || !senha.value) {
         if (avisouCamposVazios) return false;
         avisouCamposVazios = true;
@@ -109,9 +135,13 @@
       }
       avisouCamposVazios = false;
 
-      const btn = Array.from(document.querySelectorAll('button, input[type="submit"]')).find(
-        (b) => /login with email|entrar com email/i.test(G.norm(b.textContent) + ' ' + (b.value || ''))
-      );
+      // "Entrar" exato (evita "Entrar com a Phantom/Solflare") ou "Login with email".
+      // O 1o rotulo da lista e comparado por igualdade exata; os demais por trecho.
+      const rotulos = CFG.labels('loginButton').map((s) => G.norm(s));
+      const btn = Array.from(document.querySelectorAll('button, input[type="submit"]')).find((b) => {
+        const t = G.norm(b.textContent + ' ' + (b.value || ''));
+        return rotulos.some((r, i) => (i === 0 ? t === r : t.indexOf(r) !== -1));
+      });
       if (!btn || btn.disabled) return false;
 
       btn.click();
@@ -122,193 +152,226 @@
   });
 
   /* ============================================================================
-     DISTRIBUIR ATRIBUTOS
+     DISTRIBUIR ATRIBUTOS (v2)
 
-     O gatilho e o stat_points da API, nunca o nivel: subir de nivel nao
-     significa ponto disponivel, e ponto disponivel e a unica coisa que importa.
-       GET /api/v1/character/me   (Bearer localStorage.auth_token)
-         data.stats.stat_points               -> personagem principal
-         data.squad_members[].stats.stat_points -> demais herois
-     Interface (mapeada em 04/09/2026):
-       button[aria-label="Status for <Classe>"]         abre o modal
-       section[role="dialog"][aria-label^="Status for "]
-         "Available PTS: N"
-         button[aria-label="Add STR|INT|DEX|VIT"]  (disabled sem pontos)
-         button[class*="_applyBtn"] "Apply"        (disabled sem alteracao)
-         button[aria-label="Close"]
-     Depois de aplicar a pagina e recarregada: o Apply as vezes reclama na tela
-     mas a distribuicao vai pro servidor do mesmo jeito, e o F5 resolve a
-     divergencia entre o que a tela mostra e o que ja foi gravado.
+     Fluxo verificado em 16/09/2026:
+       1. botao do HUD "Heroi" (texto comeca com "Her(o|ó)i", fora do <aside>)
+       2. painel lateral <aside> com <li> de cartoes:
+            button[aria-label^="Abrir "][data-hero="<id>"]
+            classe (estavel) = sprite "<classe>-card.png" -> warrior|ranger|priest|mage
+       3. clicar no cartao abre um modal div[role="dialog"] com:
+            [data-testid="hero-points"] [class*="pointsValue"]   -> pontos disponiveis
+            tr[data-attr="attr.strength|intelligence|dexterity|vitality"]
+              button[class*="stepUp"]   -> "+"  (o outro stepper e o "-")
+            botao "Aplicar"             -> grava (fica off ate haver mudanca)
+            botao [aria-label="Voltar à batalha"] -> fecha
+       "Devolver pontos" custa ouro: NUNCA e tocado.
+       O Aplicar grava no servidor (testado: Forca 56 -> 57, pontos 1 -> 0).
      ========================================================================== */
 
-  const ATTRS = ['STR', 'INT', 'DEX', 'VIT'];
-  const DEFAULT_PLAN = { Warrior: 'STR', Priest: 'INT', Ranger: 'DEX', Wizard: 'INT', default: 'STR' };
+  const ATTR_KEYS = ['strength', 'intelligence', 'dexterity', 'vitality'];
 
   let proximaChecagemAt = 0;
-  const semBotaoAvisado = {};
 
-  const heroButtons = () =>
-    Array.from(document.querySelectorAll('button[aria-label^="Status for "]')).filter(G.isVisible);
+  const isVis = (el) => G.isVisible(el);
 
-  const heroName = (btn) => btn.getAttribute('aria-label').replace('Status for ', '').trim();
+  const heroNavBtn = () =>
+    Array.from(document.querySelectorAll('button'))
+      .filter(isVis)
+      .find((b) => CFG.navRegex().test(G.norm(b.textContent)) && !b.closest('aside'));
 
-  const openDialog = () => document.querySelector('section[role="dialog"][aria-label^="Status for "]');
+  const cartoes = () => Array.from(document.querySelectorAll(CFG.sel('heroCard'))).filter(isVis);
 
-  /* Le os pontos disponiveis de todos os herois direto da API. */
-  async function pontosPelaApi() {
-    const tk = localStorage.getItem('auth_token') || localStorage.getItem('token');
-    if (!tk) throw new Error('sem token no localStorage');
-    // o ?with_inventory=1 e o que faz a API devolver squad_members (sem ele vem
-    // so o personagem principal e os outros herois ficariam invisiveis)
-    const res = await fetch('/api/v1/character/me?with_inventory=1', {
-      headers: { Authorization: 'Bearer ' + tk, Accept: 'application/json' },
-    });
-    if (!res.ok) throw new Error('API HTTP ' + res.status);
-    const j = await res.json();
-    const d = j.data || j;
-    const lista = [];
-    const add = (h) => {
-      if (!h || !h.stats) return;
-      lista.push({
-        nome: h.class_name || h.name || h.class || '?',
-        pts: Number(h.stats.stat_points) || 0,
-        level: h.level,
-      });
-    };
-    add(d);
-    (d.squad_members || []).forEach(add);
-    return lista;
+  /* Deriva a classe em ingles a partir do sprite "<classe>-card.png". */
+  function classeDoCartao(card) {
+    const li = card.closest('li');
+    const img = li && li.querySelector(CFG.sel('cardSprite'));
+    if (img) {
+      const m = (img.getAttribute('src') || '').match(/([a-z]+)-card/i);
+      if (m) return m[1].toLowerCase();
+    }
+    const nameEl = li && li.querySelector(CFG.sel('cardName'));
+    const title = nameEl && (nameEl.getAttribute('title') || '');
+    if (title) return title.split('_')[0].toLowerCase();
+    return G.norm(card.getAttribute('aria-label').replace('Abrir ', ''));
   }
 
-  /* Le "Available PTS: N" do modal (usado como plano B se a API falhar). */
-  function readPts(dlg) {
-    for (const n of dlg.querySelectorAll('p, div, span, strong')) {
-      const t = G.norm(n.textContent);
-      if (t.indexOf('available pts') === 0 || t.indexOf('pts disponiveis') === 0) {
-        const m = t.match(/(\d+)/);
-        if (m) return Number(m[1]);
-      }
+  const nomeDoCartao = (card) => {
+    const li = card.closest('li');
+    const nameEl = li && li.querySelector(CFG.sel('cardName'));
+    return nameEl ? G.norm(nameEl.textContent) : card.getAttribute('aria-label').replace('Abrir ', '');
+  };
+
+  async function abrirPainelHerois() {
+    if (cartoes().length) return true;
+    const nav = heroNavBtn();
+    if (!nav) return false;
+    nav.click();
+    for (let i = 0; i < 16; i++) {
+      await wait(500);
+      if (cartoes().length) return true;
     }
-    const row = dlg.querySelector('[title="Stat Points"]');
-    if (row) {
-      const m = G.norm(row.textContent).match(/(\d+)/);
-      if (m) return Number(m[1]);
-    }
-    return 0;
+    return false;
   }
 
-  function applyButton(dlg) {
-    return Array.from(dlg.querySelectorAll('button')).find(
-      (b) => G.norm(b.textContent) === 'apply' || (b.className || '').indexOf('_applyBtn') !== -1
+  const modalAberto = () => {
+    const dlg = Array.from(document.querySelectorAll('div[role="dialog"]')).find(
+      (d) => isVis(d) && d.querySelector(CFG.sel('dialogHasAttr'))
     );
+    return dlg || null;
+  };
+
+  const lerPontos = (dlg) => {
+    const p = dlg.querySelector(CFG.sel('heroPoints'));
+    return p ? Number(G.norm(p.textContent)) || 0 : 0;
+  };
+
+  /* O modal abre antes do GET /characters/<id>/sheet responder (~1,4s) e a
+     tabela so rende ~1,7s depois. Espera a tela ficar PRONTA de verdade:
+     modal com atributos, sem spinner, com pontos e valor estavel entre
+     duas leituras (garante que a resposta do /sheet ja re-renderizou). */
+  async function esperarSheetPronto() {
+    let ultimo = null;
+    let estavel = 0;
+    const attrForca = CFG.sel('attrRow').replace('{attr}', 'strength');
+    for (let i = 0; i < 45; i++) { // ate ~9s
+      const dlg = Array.from(document.querySelectorAll('div[role="dialog"]')).find(
+        (d) => isVis(d) && d.querySelector(CFG.sel('dialogHasAttr'))
+      );
+      if (dlg) {
+        const carregando = dlg.querySelector(CFG.sel('loadingInDialog'));
+        const p = dlg.querySelector(CFG.sel('heroPoints'));
+        const forca = dlg.querySelector(attrForca + ' [class*="attrValue"]');
+        if (!carregando && p && forca) {
+          const assinatura = G.norm(p.textContent) + '|' + G.norm(forca.textContent);
+          if (assinatura === ultimo) {
+            if (++estavel >= 2) return dlg; // estavel por ~400ms
+          } else {
+            ultimo = assinatura;
+            estavel = 0;
+          }
+        }
+      }
+      await wait(200);
+    }
+    return Array.from(document.querySelectorAll('div[role="dialog"]')).find(
+      (d) => isVis(d) && d.querySelector(CFG.sel('dialogHasAttr'))
+    ) || null;
   }
 
-  async function closeDialog() {
-    const dlg = document.querySelector('section[role="dialog"]');
+  const btnAplicar = (dlg) => {
+    const rotulos = CFG.labels('apply').map((s) => G.norm(s));
+    return Array.from(dlg.querySelectorAll('button')).find((b) => rotulos.some((r) => G.norm(b.textContent).indexOf(r) === 0));
+  };
+
+  async function fecharModal() {
+    const dlg = Array.from(document.querySelectorAll('div[role="dialog"]')).find(isVis);
     if (!dlg) return;
-    const btn = dlg.querySelector('button[aria-label="Close"]') ||
+    const c = dlg.querySelector(CFG.sel('closeModal')) ||
       Array.from(dlg.querySelectorAll('button')).find((b) => G.norm(b.textContent) === '✕');
-    if (btn) btn.click();
+    if (c) c.click();
     else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await wait(500);
   }
 
-  /* Abre o heroi, gasta os pontos no atributo escolhido e da Apply. */
-  async function distribuir(btn, plan, ptsEsperados) {
-    const hero = heroName(btn);
-    btn.click();
-    await wait(900);
+  async function fecharPainelHerois() {
+    const sel = 'aside ' + CFG.sel('closeModal') + ', button[aria-label^="Fechar"]';
+    Array.from(document.querySelectorAll(sel)).filter(isVis).forEach((b) => b.click());
+    await wait(400);
+  }
 
-    const dlg = openDialog();
-    if (!dlg) return { hero, erro: 'modal nao abriu' };
+  /* Abre um cartao, gasta os pontos no atributo do plano e da Aplicar.
+     O modal e SEMPRE fechado no finally, mesmo se algo der errado no meio -
+     e o que evita deixar o painel aberto por cima da batalha (travar). */
+  async function distribuir(card, plan) {
+    const classe = classeDoCartao(card);
+    const nome = nomeDoCartao(card);
+    card.click();
+    try {
+      const dlg = await esperarSheetPronto();
+      if (!dlg) return { nome, erro: 'modal nao carregou (sheet demorou demais)' };
 
-    const pts = ptsEsperados || readPts(dlg);
-    if (pts <= 0) { await closeDialog(); return { hero, pts: 0 }; }
+      const pts = lerPontos(dlg);
+      if (pts <= 0) return { nome, pts: 0 };
 
-    const attr = ATTRS.indexOf(plan[hero]) !== -1 ? plan[hero] : plan.default || 'STR';
-    let cliques = 0;
-    for (let i = 0; i < pts + 5 && cliques < 500; i++) {
-      const add = dlg.querySelector('button[aria-label="Add ' + attr + '"]');
-      if (!add || add.disabled) break;
-      add.click();
-      cliques++;
-      await wait(70);
+      const attr = ATTR_KEYS.indexOf(plan[classe]) !== -1 ? plan[classe] : plan.default || 'strength';
+      const linha = dlg.querySelector(CFG.sel('attrRow').replace('{attr}', attr));
+      if (!linha) return { nome, pts, erro: 'linha attr.' + attr + ' nao encontrada' };
+
+      let cliques = 0;
+      for (let i = 0; i < pts + 5 && cliques < 500; i++) {
+        const mais = linha.querySelector(CFG.sel('stepUp'));
+        if (!mais || mais.disabled) break;
+        mais.click();
+        cliques++;
+        await wait(90);
+      }
+      if (!cliques) return { nome, pts, erro: 'botao + nao habilitou' };
+
+      let aplicado = false;
+      const ap = btnAplicar(dlg);
+      if (ap && !ap.disabled) {
+        ap.click();
+        aplicado = true;
+        await wait(1300);
+      }
+
+      // Na v2 o Aplicar grava direto no servidor (testado). Nao recarregamos mais:
+      // se por acaso os pontos nao zerarem, so registramos e a proxima varredura
+      // tenta de novo - reiniciar o jogo era pior que o problema.
+      const restante = lerPontos(dlg);
+      return { nome, pts, attr, cliques, aplicado, restante };
+    } finally {
+      await fecharModal();
     }
-    if (!cliques) { await closeDialog(); return { hero, pts, erro: 'botao "Add ' + attr + '" nao habilitou' }; }
-
-    let aplicado = false;
-    const apply = applyButton(dlg);
-    if (apply && !apply.disabled) {
-      apply.click();
-      aplicado = true;
-      await wait(1200);
-      const ok = G.findByText(['Confirm', 'Confirmar', 'Yes', 'Sim'], { exact: true, clickable: true });
-      if (ok) { ok.click(); await wait(700); }
-    }
-    return { hero, pts, attr, cliques, aplicado };
   }
 
   async function checar() {
-    const plan = Object.assign({}, DEFAULT_PLAN, G.getSetting('attrPlan', {}));
+    const plan = Object.assign({}, CFG.plan(), G.getSetting('attrPlan', {}));
 
-    let herois;
-    try {
-      herois = await pontosPelaApi();
-      chrome.storage.local.set({ heroes: herois.map((h) => h.nome) });
-    } catch (err) {
-      // plano B: le pelo modal do primeiro heroi que tiver pontos
-      const btns = heroButtons();
-      if (!btns.length) return false;
-      for (const btn of btns) {
-        const r = await distribuir(btn, plan, 0);
-        if (r.cliques) {
-          setTimeout(() => location.reload(), 1000);
-          return r.hero + ': +' + r.cliques + ' ' + r.attr + ' (API off: ' + err.message + ') - recarregando';
-        }
-      }
-      await closeDialog();
+    if (!(await abrirPainelHerois())) {
+      // painel abriu vazio (jogo atualizando/reconectando) ou nem abriu:
+      // fecha o que tiver ficado aberto e sai sem mexer em nada.
+      await fecharPainelHerois();
       return false;
     }
 
-    const comPontos = herois.filter((h) => h.pts > 0);
-    if (!comPontos.length) return false; // nada a fazer, nem abre modal
+    const feitos = [];
+    try {
+      const cards = cartoes();
+      chrome.storage.local.set({
+        heroes: cards.map((c) => ({ classe: classeDoCartao(c), nome: nomeDoCartao(c) })),
+      });
 
-    const botoes = heroButtons();
-    for (const h of comPontos) {
-      const btn = botoes.find((b) => heroName(b) === h.nome);
-      if (!btn) {
-        if (!semBotaoAvisado[h.nome]) {
-          semBotaoAvisado[h.nome] = true;
-          G.log('[Distribuir atributos] ' + h.nome + ' tem ' + h.pts + ' PTS mas nao esta nos slots visiveis da party');
-        }
-        continue;
+      for (let k = 0; k < cards.length; k++) {
+        // re-seleciona a cada volta: o React troca os nos entre aberturas
+        const atuais = cartoes();
+        const card = atuais[k];
+        if (!card) continue;
+        const r = await distribuir(card, plan);
+        if (r.cliques) feitos.push(r.nome + ': +' + r.cliques + ' ' + r.attr + (r.aplicado ? '' : ' (Aplicar nao habilitou)'));
+        else if (r.erro) feitos.push(r.nome + ': ' + r.erro);
+        await wait(400);
       }
-      const r = await distribuir(btn, plan, h.pts);
-      if (r.erro) { await closeDialog(); return r.hero + ': ' + r.erro; }
-      if (!r.cliques) { await closeDialog(); continue; }
-
-      // Um heroi por vez: aplica, recarrega e o proximo ciclo pega o resto.
-      setTimeout(() => location.reload(), 1000);
-      return r.hero + ': +' + r.cliques + ' ' + r.attr +
-        (r.aplicado ? '' : ' (Apply nao habilitou)') + ' - recarregando para confirmar';
+    } finally {
+      await fecharPainelHerois();
     }
-
-    await closeDialog();
-    return false;
+    return feitos.length ? feitos.join(' | ') : false;
   }
 
   G.registerTask({
     id: 'auto-attributes',
     name: 'Distribuir atributos',
-    description: 'Consulta stat_points na API; se houver ponto, gasta no atributo escolhido, aplica e recarrega.',
+    description: 'Abre cada heroi, gasta os Pontos no atributo escolhido e da Aplicar.',
     everyMs: 5000,
     cooldownMs: 10000,
     defaultEnabled: true,
     run() {
       if (!noJogo()) return false;
-      if (!heroButtons().length) return false;
-      if (document.querySelector('section[role="dialog"]')) return false; // voce esta com algo aberto
+      if (jogoAtualizando()) return false; // servidor no meio de update: nao mexe
       if (Date.now() < proximaChecagemAt) return false;
+      // nao interfere se voce ja esta com um modal/painel aberto na mao
+      if (modalAberto() || document.querySelector('aside')) return false;
 
       const minutos = Number(G.getSetting('attrSweepMinutes', 3)) || 3;
       proximaChecagemAt = Date.now() + minutos * 60 * 1000;

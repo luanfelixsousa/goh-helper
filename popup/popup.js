@@ -9,11 +9,19 @@ const DEFAULTS = {
     'close-dialogs': false,
   },
   attrSweepMinutes: 3,
-  attrPlan: { Warrior: 'STR', Priest: 'INT', Ranger: 'DEX', Wizard: 'INT', default: 'STR' },
+  // chave = classe em ingles (estavel); valor = atributo (data-attr da v2)
+  attrPlan: { warrior: 'strength', priest: 'intelligence', ranger: 'dexterity', wizard: 'intelligence', default: 'strength' },
 };
 
-const ATTRS = ['STR', 'INT', 'DEX', 'VIT'];
-const ATTR_NOMES = { STR: 'STR (forca)', INT: 'INT (inteligencia)', DEX: 'DEX (destreza)', VIT: 'VIT (vitalidade)' };
+// atributos da v2: chave estavel -> rotulo em portugues
+const ATTRS = [
+  { key: 'strength', label: 'Forca' },
+  { key: 'intelligence', label: 'Inteligencia' },
+  { key: 'dexterity', label: 'Destreza' },
+  { key: 'vitality', label: 'Vitalidade' },
+];
+// nomes das classes em portugues (para quando o heroi ainda nao foi lido do jogo)
+const CLASSE_PT = { warrior: 'Guerreiro', priest: 'Sacerdote', ranger: 'Patrulheiro', wizard: 'Mago' };
 
 const $ = (id) => document.getElementById(id);
 let settings = DEFAULTS;
@@ -83,24 +91,33 @@ function renderLog(entries) {
 function renderHeroes(heroes) {
   const box = $('heroes');
   box.textContent = '';
-  const lista = heroes && heroes.length ? heroes : Object.keys(DEFAULTS.attrPlan).filter((k) => k !== 'default');
+  // cada item: { classe, nome }. Sem dados do jogo ainda, usa o plano padrao.
+  const lista = heroes && heroes.length
+    ? heroes
+    : Object.keys(DEFAULTS.attrPlan)
+        .filter((k) => k !== 'default')
+        .map((classe) => ({ classe, nome: CLASSE_PT[classe] || classe }));
+
   lista.forEach((hero) => {
+    const classe = hero.classe || hero;
+    const nome = hero.nome || CLASSE_PT[classe] || classe;
+
     const row = document.createElement('label');
     row.className = 'attr';
 
     const name = document.createElement('span');
-    name.textContent = hero;
+    name.textContent = nome;
 
     const sel = document.createElement('select');
     ATTRS.forEach((a) => {
       const op = document.createElement('option');
-      op.value = a;
-      op.textContent = ATTR_NOMES[a];
+      op.value = a.key;
+      op.textContent = a.label;
       sel.appendChild(op);
     });
-    sel.value = settings.attrPlan[hero] || settings.attrPlan.default || 'STR';
+    sel.value = settings.attrPlan[classe] || settings.attrPlan.default || 'strength';
     sel.addEventListener('change', () => {
-      settings.attrPlan[hero] = sel.value;
+      settings.attrPlan[classe] = sel.value;
       save();
     });
 
@@ -110,18 +127,40 @@ function renderHeroes(heroes) {
   });
 }
 
+function renderVersao(d) {
+  const manifest = chrome.runtime.getManifest();
+  const cfgV = d.remoteConfig && d.remoteConfig.configVersion ? d.remoteConfig.configVersion : '—';
+  $('versao').textContent = 'v' + manifest.version + ' · config ' + cfgV;
+
+  const upd = d.updateAvailable;
+  const banner = $('updateBanner');
+  if (upd && upd.version) {
+    banner.textContent = '⬆ Atualizacao disponivel (v' + upd.version + ') - clique para baixar';
+    banner.href = upd.url || 'https://github.com/luanfelixsousa/goh-helper/releases';
+    banner.hidden = false;
+  } else {
+    banner.hidden = true;
+  }
+}
+
 function load() {
-  chrome.storage.local.get({ settings: DEFAULTS, catalog: [], log: [], heroes: [] }, (d) => {
-    settings = Object.assign({}, DEFAULTS, d.settings || {});
-    settings.tasks = Object.assign({}, DEFAULTS.tasks, settings.tasks || {});
-    settings.attrPlan = Object.assign({}, DEFAULTS.attrPlan, settings.attrPlan || {});
-    renderMaster();
-    $('reloadMinutes').value = settings.reloadMinutes;
-    $('attrSweepMinutes').value = settings.attrSweepMinutes;
-    renderTasks(d.catalog);
-    renderHeroes(d.heroes);
-    renderLog(d.log);
-  });
+  chrome.storage.local.get(
+    { settings: DEFAULTS, catalog: [], log: [], heroes: [], remoteConfig: null, updateAvailable: null },
+    (d) => {
+      settings = Object.assign({}, DEFAULTS, d.settings || {});
+      settings.tasks = Object.assign({}, DEFAULTS.tasks, settings.tasks || {});
+      settings.attrPlan = Object.assign({}, DEFAULTS.attrPlan, settings.attrPlan || {});
+      renderMaster();
+      $('reloadMinutes').value = settings.reloadMinutes;
+      $('attrSweepMinutes').value = settings.attrSweepMinutes;
+      renderTasks(d.catalog);
+      renderHeroes(d.heroes);
+      renderLog(d.log);
+      renderVersao(d);
+    }
+  );
+  // verifica a config remota ao abrir o popup
+  try { chrome.runtime.sendMessage({ type: 'goh:check-config' }, () => void chrome.runtime.lastError); } catch (_) {}
 }
 
 $('attrSweepMinutes').addEventListener('change', (e) => {
@@ -157,6 +196,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes.log) renderLog(changes.log.newValue);
   if (changes.catalog) renderTasks(changes.catalog.newValue);
   if (changes.heroes) renderHeroes(changes.heroes.newValue);
+  if (changes.remoteConfig || changes.updateAvailable) {
+    chrome.storage.local.get({ remoteConfig: null, updateAvailable: null }, renderVersao);
+  }
 });
 
 load();
