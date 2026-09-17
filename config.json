@@ -1,5 +1,5 @@
 {
-  "configVersion": 1,
+  "configVersion": 2,
   "codeVersion": "2.0.0",
   "downloadUrl": "https://github.com/luanfelixsousa/goh-helper",
   "_comment": "Config remota - SO DADOS (seletores, textos, plano). Edite aqui quando o jogo mudar e todos pegam sozinhos, sem reinstalar. Suba 'configVersion' a cada mudanca. 'codeVersion' so muda quando o CODIGO da extensao muda (ai aparece o aviso de atualizar).",
