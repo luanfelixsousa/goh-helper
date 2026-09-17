@@ -17,8 +17,11 @@ Tudo pode ser ligado e desligado uma a uma no painel, e existe um interruptor ge
 
 ## Privacidade
 
-- **Nao envia nada para lugar nenhum.** Nao existe servidor, analytics ou telemetria.
-  A unica chamada de rede e para o proprio `gameofheroes.com`, a mesma que o jogo ja faz.
+- **Nao envia nenhum dado seu para lugar nenhum.** Nao existe servidor, analytics ou telemetria.
+  A extensao faz duas leituras de rede, ambas so BAIXAM (nunca enviam nada seu):
+  (1) `gameofheroes.com`, a mesma que o jogo ja faz; e (2) um `config.json` publico no
+  GitHub (`raw.githubusercontent.com/luanfelixsousa/goh-helper`), que traz apenas seletores
+  e textos para a extensao se adaptar quando o jogo muda, sem voce precisar reinstalar.
 - **Nunca le sua senha nem seu email.** O login automatico so confere se os campos ja
   estao preenchidos pelo navegador e clica no botao.
 - Suas configuracoes e o log ficam **so na sua maquina** e somem se voce desinstalar.
