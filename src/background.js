@@ -9,7 +9,7 @@ const MATCH = ['https://gameofheroes.com/*', 'https://*.gameofheroes.com/*'];
 // config remota (so DADOS: seletores, textos, plano). Nunca codigo executavel.
 const CONFIG_URL = 'https://raw.githubusercontent.com/luanfelixsousa/goh-helper/main/config.json';
 const CONFIG_EVERY_MIN = 180; // 3h
-const RELEASES_URL = 'https://github.com/luanfelixsousa/goh-helper/releases';
+const RELEASES_URL = 'https://github.com/luanfelixsousa/goh-helper';
 
 const DEFAULTS = {
   enabled: true,
